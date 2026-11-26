@@ -110,6 +110,17 @@ dialog label{display:block;font-size:12px;color:var(--mut);margin:10px 0 3px}
 @media(max-width:1100px){.cols{grid-template-columns:1fr}}
 @media(max-width:760px){.app{grid-template-columns:1fr}aside{position:static;height:auto}.grid,.pipe{grid-template-columns:repeat(2,1fr)}.cta{margin-left:0}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.rt{width:100%;border-collapse:collapse;font-size:12px;min-width:820px}
+.rt th{background:var(--navy);color:#fff;padding:8px;text-align:right;font-weight:600}
+.rt td{padding:8px;text-align:right;border-bottom:1px solid var(--line)}
+.rt tr.sum td{background:var(--amber);font-weight:700}
+.sc{overflow-x:auto}
+.ch{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+.leg{font-size:11px;color:var(--mut);margin-top:4px}
+.pho{display:none;font-weight:700;margin-bottom:10px}
+@media(max-width:900px){.ch{grid-template-columns:1fr}}
+@media print{:root,:root[data-theme="dark"],:root:not([data-theme="light"]){--bg:#fff;--card:#fff;--ink:#14224a;--mut:#6b7794;--soft:#eef2fb;--line:#e3e9f7;--amber:#fff3c9;--bar:#f5f8ff;color-scheme:light}
+aside,.top,.noprint,#warn,.toast{display:none!important}.app{display:block;padding:0}body{background:#fff}.card{break-inside:avoid;border:1px solid var(--line)}.pho{display:block}}
 </style>
 </head>
 <body>
@@ -148,6 +159,7 @@ const wkOf=d=>d<=7?1:d<=14?2:d<=21?3:4;
 const wkRange=(y,m,w)=>w===4?[22,dim(y,m)]:[(w-1)*7+1,w*7];
 const MON=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 let C=[],I=[],N=[],view="beranda",qs="",db=null,mem=false,uname="",pm=now0.getFullYear()+"-"+String(now0.getMonth()+1).padStart(2,"0"),pw=wkOf(now0.getDate());
+let R=[],rp="Instagram",rm=pm;
 const num=v=>v===""||v==null||isNaN(+v)?null:+v;
 const inter=c=>["likes","comments","shares","saves"].reduce((a,k)=>a+(+c[k]||0),0);
 const hasI=c=>["likes","comments","shares","saves"].some(k=>c[k]!=null);
@@ -155,7 +167,7 @@ const erOf=c=>+c.views>0?(hasI(c)?inter(c)/c.views*100:(+c.er||0)):0;
 const lk=l=>/^https?:\/\//i.test(l||"")?l:"";
 const inP=c=>{if(!c.date)return pw===0;const d=new Date(c.date);return d.getFullYear()+"-"+pad(d.getMonth()+1)===pm&&(pw===0||wkOf(d.getDate())===pw)};
 function fbar(){const[y,m]=pm.split("-").map(Number);return`<div class="fl"><input type="month" id="pmI" value="${pm}" aria-label="Bulan" style="width:auto">${[1,2,3,4].map(w=>{const[a,b]=wkRange(y,m,w);return`<button class="pill ${pw===w?"on":""}" data-w="${w}">Week ${w} <small>${a}–${b}</small></button>`}).join("")}<button class="pill ${pw===0?"on":""}" data-w="0">Semua</button></div>`}
-const NAV=[["beranda","🏠","Beranda"],["konten","🗓️","Konten"],["idea","💡","Idea Bank"],["analytics","📈","Analytics"]];
+const NAV=[["beranda","🏠","Beranda"],["konten","🗓️","Konten"],["idea","💡","Idea Bank"],["analytics","📈","Analytics"],["report","📑","Report"]];
 let tt;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("s");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("s"),2000)}
 const pad=n=>String(n).padStart(2,"0");
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -165,14 +177,14 @@ const nf=n=>n>=1000?(n/1000).toFixed(1).replace(".",",")+" rb":String(n||0);
 const API_OK=!API_URL.startsWith("ISI");
 let last="",pend=0;
 const nid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const LST=c=>c==="contents"?C:c==="ideas"?I:N;
-const setL=(c,L)=>{if(c==="contents")C=L;else if(c==="ideas")I=L;else N=L};
+const LST=c=>c==="contents"?C:c==="ideas"?I:c==="reports"?R:N;
+const setL=(c,L)=>{if(c==="contents")C=L;else if(c==="ideas")I=L;else if(c==="reports")R=L;else N=L};
 async function sync(){
   if(!API_OK||pend)return;
   try{
     const r=await fetch(API_URL+"?action=list&t="+Date.now()),j=await r.json();if(!j.ok)throw new Error(j.error||"gagal memuat");
     $("#warn").innerHTML="";const k=JSON.stringify(j.data);if(k===last)return;
-    last=k;C=j.data.contents;I=j.data.ideas;N=j.data.notes;draw();
+    last=k;C=j.data.contents;I=j.data.ideas;N=j.data.notes;R=j.data.reports||[];draw();
   }catch(x){$("#warn").innerHTML='<div class="warn">Tidak bisa terhubung ke Google Sheet, jadi data mungkin belum terbaru. ('+e(x.message||x)+')</div>'}
 }
 async function api(body){
@@ -180,7 +192,7 @@ async function api(body){
   try{
     const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});
     const j=await r.json();if(!j.ok)throw new Error(j.error||"gagal");
-  }catch(x){last="";toast("Gagal menyimpan ke Google Sheet: "+(x.message||x))}
+  }catch(x){last="";const m=String(x.message||x);toast(/koleksi|aksi/.test(m)?"Perbarui Code.gs di Apps Script dulu (lihat tutorial), lalu coba lagi.":"Gagal menyimpan ke Google Sheet: "+m)}
   finally{pend--;sync()}
 }
 async function put(c,id,data,merge){
@@ -188,6 +200,7 @@ async function put(c,id,data,merge){
   setL(c,[body,...L.filter(x=>x.id!==id)]);draw();
   await api({action:"put",c,id,data:body});
 }
+async function putMany(c,items){const L=LST(c),ids=new Set(items.map(x=>x.id));setL(c,[...items.map(x=>({...x.data,id:x.id})),...L.filter(x=>!ids.has(x.id))]);draw();await api({action:"putmany",c,items})}
 async function del(c,id){setL(c,LST(c).filter(x=>x.id!==id));draw();await api({action:"del",c,id})}
 // ---- hitung ----
 function stats(){
@@ -218,7 +231,7 @@ function draw(){
   $("#streak").textContent="🔥 "+s.streak;$("#wkchip").textContent=`Week ${s.w} · ${s.a}–${s.b} ${MON[s.m-1]}`;
   $("#notes").innerHTML=N.slice().sort((a,b)=>b.at-a.at).map(n=>`<div class="note"><button class="x" style="text-align:left;color:inherit;flex:1" data-en="${n.id}" aria-label="Ubah catatan"><b>${e(n.text)}</b><small>${new Date(n.at).toLocaleDateString("id-ID",{day:"numeric",month:"short"})}</small></button><button class="x" data-dn="${n.id}" aria-label="Hapus catatan">✕</button></div>`).join("")||'<small class="mut">Belum ada catatan. Tekan + untuk menambah.</small>';
   const v=$("#view");
-  if(view==="beranda")v.innerHTML=home(s);else if(view==="konten")v.innerHTML=list();else if(view==="idea")v.innerHTML=ideas();else v.innerHTML=analytics();
+  if(view==="beranda")v.innerHTML=home(s);else if(view==="konten")v.innerHTML=list();else if(view==="idea")v.innerHTML=ideas();else if(view==="report")v.innerHTML=report();else v.innerHTML=analytics();
 }
 function emptyBox(){return`<div class="empty"><p><b>Belum ada konten.</b><br>Tambahkan konten pertama atau isi dengan data contoh untuk mencoba.</p><button class="btn" data-a="new">+ Konten baru</button> <button class="btn g" data-a="seed">Isi data contoh</button></div>`}
 function home(s){
@@ -300,6 +313,80 @@ function analyticsOld(){
   return`<div class="bar"><h2>Analytics</h2></div><div class="grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px"><div class="card"><span class="mut">Konten tayang</span><h2 style="margin:4px 0 0">${T.length}</h2></div><div class="card"><span class="mut">Total views</span><h2 style="margin:4px 0 0">${nf(tv)}</h2></div><div class="card"><span class="mut">Rata-rata ER</span><h2 style="margin:4px 0 0">${er}%</h2></div></div>
   <div class="card"><h4>Views per platform</h4>${Object.entries(by).map(([k,v])=>`<div style="margin:8px 0"><div class="mut">${e(k)} · ${nf(v)}</div><div class="pb" style="max-width:none;background:var(--soft)"><div style="width:${v/mx*100}%;background:var(--pri)"></div></div></div>`).join("")||'<span class="mut">Belum ada data. Ubah status konten menjadi Tayang dan isi views.</span>'}</div>`;
 }
+// ---- report ----
+const MET=[["impression","Impression"],["reach","Reach"],["visit","Visit"],["follower","Follower"],["like","Like"],["share","Share"],["comment","Comment"],["save","Save"],["repost","Repost"],["clicks","Link Clicks"]];
+const PLAT=["Instagram","TikTok","YouTube","Threads"],COL=["#2d6cf0","#7c3aed","#10b981","#f59e0b","#ef4444"];
+const rid=(p,m,w)=>`${p}-${m}-w${w}`;
+const rrow=(p,m,w)=>R.find(r=>r.id===rid(p,m,w));
+const rsum=(p,m)=>{const o={};MET.forEach(([k])=>o[k]=0);[1,2,3,4].forEach(w=>{const r=rrow(p,m,w);if(r)MET.forEach(([k])=>o[k]+=+r[k]||0)});return o};
+const reng=o=>o.reach>0?(o.like+o.share+o.comment+o.save+o.repost)/o.reach*100:0;
+const pmo=m=>{const[y,mo]=m.split("-").map(Number),d=new Date(y,mo-2,1);return d.getFullYear()+"-"+pad(d.getMonth()+1)};
+const mlabel=m=>{const[y,mo]=m.split("-").map(Number);return MON[mo-1]+" "+y};
+const mshort=m=>{const[y,mo]=m.split("-").map(Number);return MON[mo-1]+" "+String(y).slice(2)};
+const cf=n=>n>=1e6?(n/1e6).toFixed(1).replace(".",",")+" jt":n>=1e3?Math.round(n/1e3)+" rb":String(Math.round(n));
+const fn=n=>Number(n||0).toLocaleString("id-ID");
+const MI={jan:1,feb:2,mar:3,apr:4,mei:5,may:5,jun:6,jul:7,agu:8,agt:8,aug:8,sep:9,sept:9,okt:10,oct:10,nov:11,des:12,dec:12};
+function grid(mx,W,H,l,t,h){return[0,.5,1].map(f=>{const y=t+h-h*f;return`<line x1="${l}" x2="${W-8}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${l-6}" y="${y+4}" text-anchor="end" font-size="10" style="fill:var(--mut)">${cf(mx*f)}</text>`}).join("")}
+const leg=S=>`<div class="leg">${S.map(s=>`<span style="color:${s.color}">●</span> ${e(s.name)}`).join(" &nbsp; ")}</div>`;
+function barSvg(labels,S){
+  const W=520,H=220,l=44,b=28,t=14,h=H-b-t,w=W-l-8,mx=Math.max(1,...S.flatMap(s=>s.vals)),g=w/labels.length,bw=Math.min(34,(g-12)/S.length);
+  let o=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Grafik batang">`+grid(mx,W,H,l,t,h);
+  labels.forEach((lb,i)=>{const cx=l+g*i+g/2;S.forEach((s,j)=>{const v=s.vals[i]||0,bh=h*v/mx;o+=`<rect x="${cx-bw*S.length/2+bw*j}" y="${t+h-bh}" width="${bw-2}" height="${bh}" rx="3" fill="${s.color}"><title>${e(s.name)} ${e(lb)}: ${fn(v)}</title></rect>`});o+=`<text x="${cx}" y="${H-8}" text-anchor="middle" font-size="10" style="fill:var(--mut)">${e(lb)}</text>`});
+  return o+"</svg>"+leg(S);
+}
+function lineSvg(labels,S){
+  const W=520,H=220,l=44,b=28,t=14,h=H-b-t,w=W-l-20,mx=Math.max(1,...S.flatMap(s=>s.vals)),n=labels.length,X=i=>l+(n>1?w*i/(n-1):w/2),Y=v=>t+h-h*v/mx;
+  let o=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Grafik garis">`+grid(mx,W,H,l,t,h);
+  S.forEach(s=>{o+=`<path d="${s.vals.map((v,i)=>(i?"L":"M")+X(i)+" "+Y(v)).join(" ")}" fill="none" stroke="${s.color}" stroke-width="2.5"/>`+s.vals.map((v,i)=>`<circle cx="${X(i)}" cy="${Y(v)}" r="3.5" fill="${s.color}"><title>${e(s.name)} ${e(labels[i])}: ${fn(v)}</title></circle>`).join("")});
+  labels.forEach((lb,i)=>{o+=`<text x="${X(i)}" y="${H-8}" text-anchor="middle" font-size="10" style="fill:var(--mut)">${e(lb)}</text>`});
+  return o+"</svg>"+leg(S);
+}
+function hbar(items){const mx=Math.max(1,...items.map(i=>i[1]));return items.map(([k,v,c])=>`<div style="margin:8px 0"><div class="mut">${e(k)} · ${fn(v)}</div><div class="pb" style="max-width:none;background:var(--soft)"><div style="width:${v/mx*100}%;background:${c||"var(--pri)"}"></div></div></div>`).join("")}
+function report(){
+  const p=rp,m=rm,S=rsum(p,m),P=rsum(p,pmo(m)),[y,mo]=m.split("-").map(Number);
+  const wv=k=>[1,2,3,4].map(w=>+(rrow(p,m,w)||{})[k]||0),has=R.some(r=>r.platform===p&&r.month===m);
+  const kpi=[["impression","Impression"],["reach","Reach"],["follower","Follower baru"],["like","Like"]].map(([k,l])=>{const d=P[k]>0?(S[k]-P[k])/P[k]*100:null;return`<div><span class="mut">${l}</span><b>${fn(S[k])}</b>${d==null?"":`<span style="font-size:11px;color:${d>=0?"#059669":"#dc2626"}">${d>=0?"▲":"▼"} ${Math.abs(d).toFixed(1).replace(".",",")}% vs bulan lalu</span>`}</div>`}).join("")+`<div><span class="mut">ER (dari Reach)</span><b>${reng(S).toFixed(2).replace(".",",")}%</b><span class="mut">(like+share+komen+save+repost) ÷ reach</span></div>`;
+  const rows=[1,2,3,4].map(w=>{const r=rrow(p,m,w),[a,b]=wkRange(y,mo,w);return`<tr><td style="text-align:left;white-space:nowrap">Week ${w} <span class="mut">${a}–${b}</span></td>${MET.map(([k])=>`<td>${r&&r[k]!=null?fn(r[k]):"–"}</td>`).join("")}<td class="noprint"><button class="btn g" style="padding:4px 10px" data-rw="${w}">${r?"Ubah":"Isi"}</button></td></tr>`}).join("");
+  const ms=[...new Set(R.filter(r=>r.platform===p).map(r=>r.month))].sort().filter(x=>x<=m).slice(-6);
+  const W4=["W1","W2","W3","W4"];
+  const trend=ms.length?lineSvg(ms.map(mshort),[{name:"Impression",color:COL[0],vals:ms.map(x=>rsum(p,x).impression)},{name:"Reach",color:COL[1],vals:ms.map(x=>rsum(p,x).reach)}]):'<span class="mut">Belum ada data bulanan.</span>';
+  return`<div class="pho">Arrayyan Al Mubarak · Digital Marketing · Report ${e(p)} ${mlabel(m)}</div>
+  <div class="bar"><h2>Report sosmed</h2><span class="noprint" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn g" data-a="imp">Impor dari spreadsheet</button><button class="btn" data-a="print">Cetak / PDF</button></span></div>
+  <div class="fl noprint"><input type="month" id="rmI" value="${m}" aria-label="Bulan" style="width:auto">${PLAT.map(x=>`<button class="pill ${x===p?"on":""}" data-rp="${x}">${x}</button>`).join("")}</div>
+  ${has?"":`<div class="warn noprint">Belum ada data ${e(p)} untuk ${mlabel(m)}. Klik <b>Isi</b> pada tiap Week, atau tempel dari spreadsheet lewat <b>Impor</b>.</div>`}
+  <div class="card"><h4>${e(p)} · ${mlabel(m)}</h4><div class="mg">${kpi}</div></div>
+  <div class="card" style="margin-top:12px"><h4>Data per Week</h4><div class="sc"><table class="rt"><thead><tr><th style="text-align:left">Week</th>${MET.map(x=>`<th>${x[1]}</th>`).join("")}<th class="noprint"></th></tr></thead><tbody>${rows}<tr class="sum"><td style="text-align:left">SUM</td>${MET.map(([k])=>`<td>${fn(S[k])}</td>`).join("")}<td class="noprint"></td></tr></tbody></table></div></div>
+  <div class="ch">
+   <div class="card"><h4>Impression &amp; Reach per Week</h4>${barSvg(W4,[{name:"Impression",color:COL[0],vals:wv("impression")},{name:"Reach",color:COL[1],vals:wv("reach")}])}</div>
+   <div class="card"><h4>Tren bulanan</h4>${trend}</div>
+   <div class="card"><h4>Komposisi interaksi</h4>${hbar([["Like",S.like,COL[0]],["Share",S.share,COL[1]],["Comment",S.comment,COL[2]],["Save",S.save,COL[3]],["Repost",S.repost,COL[4]]])}</div>
+   <div class="card"><h4>Follower baru &amp; Link Clicks per Week</h4>${barSvg(W4,[{name:"Follower",color:COL[2],vals:wv("follower")},{name:"Link Clicks",color:COL[3],vals:wv("clicks")}])}</div>
+   <div class="card"><h4>Perbandingan platform (Impression)</h4>${hbar(PLAT.map((x,i)=>[x,rsum(x,m).impression,COL[i]]))}</div>
+   <div class="card"><h4>Engagement per platform (ER dari Reach)</h4>${hbar(PLAT.map((x,i)=>[x,0,COL[i]]).map(a=>[a[0]+" "+reng(rsum(a[0],m)).toFixed(2).replace(".",",")+"%",reng(rsum(a[0],m)),a[2]]))}</div>
+  </div>`;
+}
+function repForm(w){
+  const r=rrow(rp,rm,w)||{},[y,mo]=rm.split("-").map(Number),[a,b]=wkRange(y,mo,w);
+  $("#f").innerHTML=`<h3 style="margin:0 0 4px">${e(rp)} · Week ${w}</h3><div class="mut">${a}–${b} ${MON[mo-1]} ${y}. Kosongkan kolom yang tidak ada.</div><div class="two" style="margin-top:8px">${MET.map(([k,l],i)=>`<div><label for="q${i}">${l}</label><input id="q${i}" type="number" min="0" inputmode="numeric" value="${e(r[k]!=null?r[k]:"")}"></div>`).join("")}</div><div style="display:flex;gap:8px;margin-top:16px;justify-content:space-between"><span>${r.id?'<button type="button" class="btn r" id="qd">Hapus</button>':""}</span><span><button type="button" class="btn g" id="aa">Batal</button> <button class="btn" id="ab">Simpan</button></span></div>`;
+  $("#dlg").showModal();$("#aa").onclick=()=>$("#dlg").close();
+  if(r.id)$("#qd").onclick=()=>{const q=$("#qd");if(q.dataset.s){del("reports",r.id);$("#dlg").close()}else{q.dataset.s=1;q.textContent="Yakin hapus?"}};
+  $("#ab").onclick=ev=>{ev.preventDefault();const d={platform:rp,month:rm,week:w};MET.forEach(([k],i)=>{const x=num($("#q"+i).value);if(x!==null)d[k]=x});put("reports",rid(rp,rm,w),d);$("#dlg").close();toast("Report disimpan")};
+}
+function parseRep(t){
+  let cur=null;const out=[];
+  t.split(/\r?\n/).forEach(line=>{
+    const c=line.split("\t").map(x=>x.trim()),mm=/^([A-Za-z]{3,4})\s*(\d{4})$/.exec(c[0]||"");
+    if(mm&&MI[mm[1].toLowerCase()])cur=mm[2]+"-"+pad(MI[mm[1].toLowerCase()]);
+    if(cur&&/^[1-4]$/.test(c[1]||"")&&c.length>=3){const d={month:cur,week:+c[1]};MET.forEach(([k],i)=>{const v=(c[2+i]||"").replace(/\D/g,"");if(v!=="")d[k]=+v});out.push(d)}
+  });
+  return out;
+}
+function impForm(){
+  $("#f").innerHTML=`<h3 style="margin:0 0 4px">Impor dari spreadsheet · ${e(rp)}</h3><div class="mut">Salin tabel dari spreadsheet (kolom Month, Week, Impression sampai Link Clicks; baris SUM boleh ikut) lalu tempel di bawah. Data masuk ke platform ${e(rp)}.</div><textarea id="imp" rows="8" style="margin-top:8px" placeholder="Tempel di sini"></textarea><div id="impn" class="mut" style="margin-top:6px"></div><div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end"><button type="button" class="btn g" id="aa">Batal</button> <button class="btn" id="ab">Impor</button></div>`;
+  $("#dlg").showModal();$("#aa").onclick=()=>$("#dlg").close();
+  $("#ab").onclick=ev=>{ev.preventDefault();const L=parseRep($("#imp").value);if(!L.length){$("#impn").textContent="Tidak ada baris yang terbaca. Pastikan menyalin dari kolom Month sampai Link Clicks.";return}
+    putMany("reports",L.map(d=>({id:rid(rp,d.month,d.week),data:{platform:rp,...d}})));$("#dlg").close();toast(L.length+" baris diimpor")};
+}
 // ---- form ----
 function form(c){
   c=c||{};const o=(a,v)=>a.map(x=>`<option ${x===v?"selected":""}>${x}</option>`).join(""),nv=k=>c[k]!=null?c[k]:"";
@@ -378,16 +465,16 @@ document.addEventListener("click",ev=>{
   const g=k=>{const b=ev.target.closest("["+k+"]");return b&&b.getAttribute(k)};
   const v=g("data-v"),ed=g("data-edit"),a=g("data-a"),dn=g("data-dn"),di=g("data-di"),go=g("data-go");
   const wk=g("data-w");if(wk!==null){pw=+wk;draw();return}
-  if(v==="exp")return csv();
+  const rpv=g("data-rp");if(rpv){rp=rpv;draw();return}const rw=g("data-rw");if(rw)return repForm(+rw);if(v==="exp")return csv();
   if(v){view=v;draw();return}
   if(ed)return form(C.find(c=>c.id===ed));
-  if(a==="new")return form();
+  if(a==="print")return window.print();if(a==="imp")return impForm();if(a==="new")return form();
   if(a==="seed")return seed();
   if(a==="idea"){const t=$("#ni").value.trim();if(t){put("ideas",nid(),{text:t,at:Date.now()});toast("Ide disimpan")}return}
   const en=g("data-en");if(en)return noteForm(N.find(x=>x.id===en));if(dn)return del("notes",dn);if(di)return del("ideas",di);
   if(go){const i=I.find(x=>x.id===go);del("ideas",go);put("contents",nid(),{title:i.text,platform:"Instagram",format:"Feed",status:"draf",date:"",campaign:"",views:0,er:0,createdAt:Date.now()});view="konten";draw();toast("Ide dipindah ke Konten")}
 });
-document.addEventListener("change",ev=>{if(ev.target.id==="pmI"&&ev.target.value){pm=ev.target.value;draw();return}const id=ev.target.dataset.st;if(id)put("contents",id,{status:ev.target.value},true)});
+document.addEventListener("change",ev=>{if(ev.target.id==="rmI"&&ev.target.value){rm=ev.target.value;draw();return}if(ev.target.id==="pmI"&&ev.target.value){pm=ev.target.value;draw();return}const id=ev.target.dataset.st;if(id)put("contents",id,{status:ev.target.value},true)});
 $("#new").onclick=()=>form();$("#exp").onclick=csv;
 function noteForm(n){n=n||{};$("#f").innerHTML=`<h3 style="margin:0 0 6px">${n.id?"Ubah catatan":"Catatan baru"}</h3><label for="nt">Isi catatan</label><textarea id="nt" rows="4" required>${e(n.text)}</textarea><div style="display:flex;gap:8px;margin-top:16px;justify-content:space-between"><span>${n.id?'<button type="button" class="btn r" id="nd">Hapus</button>':""}</span><span><button type="button" class="btn g" id="aa">Batal</button> <button class="btn" id="ab">Simpan</button></span></div>`;$("#dlg").showModal();$("#nt").focus();$("#aa").onclick=()=>$("#dlg").close();if(n.id)$("#nd").onclick=()=>{del("notes",n.id);$("#dlg").close()};$("#ab").onclick=ev=>{const t=$("#nt").value.trim();if(!t)return;ev.preventDefault();put("notes",n.id||nid(),{text:t,at:n.at||Date.now()});$("#dlg").close();toast("Catatan disimpan")}}
 $("#addNote").onclick=()=>noteForm();
